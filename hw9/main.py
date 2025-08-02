@@ -14,38 +14,29 @@
 Застосуйте найкращі практики для захисту збережених файлів та доступу до них.
 '''
 
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File
-import os
-import shutil
-from PIL import Image
+from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException
 
 app = FastAPI()
 
 
-def upload_photo_background(photo, photo_name, photo_size):
-    photo_type = photo_name.split(".")
-    photo_size_mb = photo_size / (1024 * 1024)
-
-    if photo_type[1] == None:
-        return {"message":"File dont have a format."}
-    
-    if photo_type[2] != None:
-        return {"message":"File cant have 2 and more formats."}
-    
-    if photo_type[1] != 'png':
-        return {"message":"Photo must be in PNG format."}
-    
-    if photo_size_mb > 3:
-        return {"message":"Photo is too big"}
-    
-    with open(f"./photos/{photo_name}", "wb") as p:
-        shutil.copyfileobj(photo, p)
-
-    return {"message":"Your photo has been upload."}
+async def upload_photo_background(photo, photo_name):
+    with open(f"./hw9/photos/{photo_name}", "wb") as p:
+        p.write(photo)
     
     
 @app.post("/upload-photo")
 async def upload_photo(background_task: BackgroundTasks, photo: UploadFile):
-    background_task.add_task(upload_photo_background, photo.file, photo.filename, photo.size)
-    return {"message":"Your photo has been sent for verification."}
+    photo_type = photo.filename.split(".")
+    photo_size_mb = photo.size / (1024 * 1024)
+    photo_for_save = await photo.read()
+    if photo_type[1] != 'png':
+        raise HTTPException(status_code=400, detail="Photo must be in PNG format.")
+    if len(photo_type) == 0:
+        raise HTTPException(status_code=400, detail="File doesn't have a format.")
+    if len(photo_type) >= 2:
+        raise HTTPException(status_code=400, detail="File can't have 2 and more formats.")
+    if photo_size_mb > 3:
+        raise HTTPException(status_code=400, detail="Photo is too big")
+    background_task.add_task(upload_photo_background, photo_for_save, photo.filename)
+    return {"message":"Your photo has been saved."}
     
